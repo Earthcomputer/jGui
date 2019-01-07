@@ -117,15 +117,15 @@ public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, 
 
     public static boolean onMouseInput() throws IOException {
         boolean result = true;
-        for (EventHandler listener : listeners)
-            result &= listener.onMouseInput();
+        for (int i = listeners.size() - 1; i >= 0; i--)
+            result &= listeners.get(i).onMouseInput();
         return result;
     }
 
     public static boolean onKeyboardInput() throws IOException {
         boolean result = true;
-        for (EventHandler listener : listeners)
-            result &= listener.onKeyboardInput();
+        for (int i = listeners.size() - 1; i >= 0; i--)
+            result &= listeners.get(i).onKeyboardInput();
         return result;
     }
 
