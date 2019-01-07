@@ -36,10 +36,6 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.crash.CrashReportCategory;
 import net.minecraft.util.ReportedException;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.util.Dimension;
 import org.lwjgl.util.Point;
@@ -47,6 +43,8 @@ import org.lwjgl.util.ReadableDimension;
 import org.lwjgl.util.ReadablePoint;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class AbstractGuiOverlay<T extends AbstractGuiOverlay<T>> extends AbstractGuiContainer<T> {
 
@@ -57,6 +55,8 @@ public abstract class AbstractGuiOverlay<T extends AbstractGuiOverlay<T>> extend
     private boolean mouseVisible;
     private boolean closeable = true;
 
+    private static List<AbstractGuiOverlay.EventHandler> listeners = new ArrayList<>();
+
     public boolean isVisible() {
         return visible;
     }
@@ -65,10 +65,10 @@ public abstract class AbstractGuiOverlay<T extends AbstractGuiOverlay<T>> extend
         if (this.visible != visible) {
             if (visible) {
                 forEach(Loadable.class).load();
-                MinecraftForge.EVENT_BUS.register(eventHandler);
+                listeners.add(eventHandler);
             } else {
                 forEach(Closeable.class).close();
-                MinecraftForge.EVENT_BUS.unregister(eventHandler);
+                listeners.remove(eventHandler);
             }
             updateUserInputGui();
         }
@@ -175,31 +175,33 @@ public abstract class AbstractGuiOverlay<T extends AbstractGuiOverlay<T>> extend
         return screenSize;
     }
 
+    public static void onRenderOverlay(float partialTicks) {
+        listeners.forEach(handler -> handler.renderOverlay(partialTicks));
+    }
+
+    public static void onTickOverlay() {
+        listeners.forEach(AbstractGuiOverlay.EventHandler::tickOverlay);
+    }
+
     private class EventHandler {
         private MinecraftGuiRenderer renderer;
 
-        @SubscribeEvent
-        public void renderOverlay(RenderGameOverlayEvent.Post event) {
-            if (event.getType() == RenderGameOverlayEvent.ElementType.ALL) {
-                updateRenderer();
-                int layers = getMaxLayer();
-                int mouseX = -1, mouseY = -1;
-                if (mouseVisible) {
-                    Point mouse = MouseUtils.getMousePos();
-                    mouseX = mouse.getX();
-                    mouseY = mouse.getY();
-                }
-                for (int layer = 0; layer <= layers; layer++) {
-                    draw(renderer, screenSize, new RenderInfo(event.getPartialTicks(), mouseX, mouseY, layer));
-                }
+        public void renderOverlay(float partialTicks) {
+            updateRenderer();
+            int layers = getMaxLayer();
+            int mouseX = -1, mouseY = -1;
+            if (mouseVisible) {
+                Point mouse = MouseUtils.getMousePos();
+                mouseX = mouse.getX();
+                mouseY = mouse.getY();
+            }
+            for (int layer = 0; layer <= layers; layer++) {
+                draw(renderer, screenSize, new RenderInfo(partialTicks, mouseX, mouseY, layer));
             }
         }
 
-        @SubscribeEvent
-        public void tickOverlay(TickEvent.ClientTickEvent event) {
-            if (event.phase == TickEvent.Phase.START) {
-                forEach(Tickable.class).tick();
-            }
+        public void tickOverlay() {
+            forEach(Tickable.class).tick();
         }
 
         private void updateRenderer() {

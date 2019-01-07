@@ -17,7 +17,7 @@ buildscript {
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'net.minecraftforge.gradle.liteloader'
 apply plugin: 'license'
 apply plugin: 'idea'
 apply plugin: 'eclipse'
@@ -35,7 +35,7 @@ sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 minecraft {
-    version = '1.12-14.21.0.2321'
+    version = '1.12'
     runDir = "eclipse"
     mappings = "snapshot_20170615"
 }

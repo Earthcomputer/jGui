@@ -3,15 +3,12 @@ package de.johni0702.minecraft.gui.container;
 import de.johni0702.minecraft.gui.function.Draggable;
 import de.johni0702.minecraft.gui.function.Scrollable;
 import de.johni0702.minecraft.gui.function.Typeable;
-import net.minecraftforge.client.event.GuiOpenEvent;
-import net.minecraftforge.client.event.GuiScreenEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.util.ReadablePoint;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, Scrollable {
 
@@ -24,6 +21,8 @@ public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, 
     private final net.minecraft.client.gui.GuiScreen mcScreen;
     private final EventHandler eventHandler = new EventHandler();
 
+    private static List<EventHandler> listeners = new ArrayList<>();
+
     public VanillaGuiScreen(net.minecraft.client.gui.GuiScreen mcScreen) {
         this.mcScreen = mcScreen;
 
@@ -35,9 +34,9 @@ public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, 
         if (!eventHandler.active) {
             eventHandler.active = true;
 
-            MinecraftForge.EVENT_BUS.register(eventHandler);
+            listeners.add(eventHandler);
 
-            getSuperMcGui().setWorldAndResolution(mcScreen.mc, mcScreen.width, mcScreen.height);
+            getSuperMcGui().setWorldAndResolution(Minecraft.getMinecraft(), mcScreen.width, mcScreen.height);
             getSuperMcGui().initGui();
         }
     }
@@ -103,13 +102,39 @@ public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, 
         return false;
     }
 
+    public static void onGuiClosed() {
+        for (int i = listeners.size() - 1; i >= 0; i--)
+            listeners.get(i).onGuiClosed();
+    }
+
+    public static void onGuiRender(int mouseX, int mouseY, float partialTicks) {
+        listeners.forEach(listener -> listener.onGuiRender(mouseX, mouseY, partialTicks));
+    }
+
+    public static void onTickOverlay() {
+        listeners.forEach(EventHandler::tickOverlay);
+    }
+
+    public static boolean onMouseInput() throws IOException {
+        boolean result = true;
+        for (EventHandler listener : listeners)
+            result &= listener.onMouseInput();
+        return result;
+    }
+
+    public static boolean onKeyboardInput() throws IOException {
+        boolean result = true;
+        for (EventHandler listener : listeners)
+            result &= listener.onKeyboardInput();
+        return result;
+    }
+
     // Used when wrapping an already existing mc.GuiScreen
     private class EventHandler {
         private boolean active;
 
-        @SubscribeEvent(priority = EventPriority.LOWEST)
-        public void onGuiClosed(GuiOpenEvent event) {
-            MinecraftForge.EVENT_BUS.unregister(this);
+        public void onGuiClosed() {
+            listeners.remove(this);
 
             if (active) {
                 active = false;
@@ -117,38 +142,36 @@ public class VanillaGuiScreen extends GuiScreen implements Draggable, Typeable, 
             }
         }
 
-        @SubscribeEvent
-        public void onGuiRender(GuiScreenEvent.DrawScreenEvent.Post event) {
-            getSuperMcGui().drawScreen(event.getMouseX(), event.getMouseY(), event.getRenderPartialTicks());
+        public void onGuiRender(int mouseX, int mouseY, float partialTicks) {
+            getSuperMcGui().drawScreen(mouseX, mouseY, partialTicks);
         }
 
-        @SubscribeEvent
-        public void tickOverlay(TickEvent.ClientTickEvent event) {
-            if (event.phase == TickEvent.Phase.START) {
-                getSuperMcGui().updateScreen();
-            }
+        public void tickOverlay() {
+            getSuperMcGui().updateScreen();
         }
 
-        @SubscribeEvent(priority = EventPriority.LOWEST)
-        public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) throws IOException {
-            event.setCanceled(true);
-
+        public boolean onMouseInput() throws IOException {
             getSuperMcGui().handleMouseInput();
+            return false;
 
+            // TODO: Forge support
+            /*
             if (mcScreen.equals(getMinecraft().currentScreen)) {
                 MinecraftForge.EVENT_BUS.post(new GuiScreenEvent.MouseInputEvent.Post(mcScreen));
             }
+            */
         }
 
-        @SubscribeEvent(priority = EventPriority.LOWEST)
-        public void onKeyboardInput(GuiScreenEvent.KeyboardInputEvent.Pre event) throws IOException {
-            event.setCanceled(true);
-
+        public boolean onKeyboardInput() throws IOException {
             getSuperMcGui().handleKeyboardInput();
+            return false;
 
+            // TODO: Forge support
+            /*
             if (mcScreen.equals(getMinecraft().currentScreen)) {
                 MinecraftForge.EVENT_BUS.post(new GuiScreenEvent.KeyboardInputEvent.Post(mcScreen));
             }
+            */
         }
     }
 }
